@@ -1,0 +1,111 @@
+RootLayout:
+    image: image
+
+    orientation: 'vertical'
+    canvas.before:
+        Color:
+            rgb: .8, .8, .8
+        Rectangle:
+            size: self.size
+            # source: 'data/background.png'
+            source:"data/icons/white-bg.png"
+    ActionBar:
+        background_image: "data/icons/white-bg.png"
+        background_color: 1,1,1,1
+        ActionView:
+            id: av
+
+            ActionPrevious:
+            ActionButton:
+                text: 'Open file'
+                icon: 'data/icons/open_file.png'
+                on_release: root.show_load()
+
+            ActionButton:
+                text: 'Connect'
+                icon: 'data/icons/connect.png'
+
+            ActionButton:
+                text: 'Disconnect'
+                icon: 'data/icons/disconnect.png'
+
+            ActionButton:
+                text: 'Start acquisition'
+                icon: 'data/icons/start_acquisition.png'
+
+            ActionButton:
+                text: 'Pause'
+                icon: 'data/icons/pause.png'
+
+            ActionButton:
+                text: 'Stop acquisition'
+                icon: 'data/icons/stop_acquisition.png'
+
+            ActionButton:
+                text: 'Device attribute'
+                icon: 'data/icons/device_attribute.png'
+
+            ActionButton:
+                text: 'About'
+                icon: 'data/icons/about.png'
+
+    BoxLayout:
+        Image:
+            id: image
+            source: 'data/faust_github.jpg'
+            size: self.texture_size
+        # Scatter:
+        #     id: scatter
+        #     size_hint: None, None
+        #     size: image.size
+
+        #     Image:
+        #         id: image
+        #         source: 'data/faust_github.jpg'
+        #         size: self.texture_size
+
+<LoadDialog>:
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        FileChooserIconView:
+            id: filechooser
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+
+            Button:
+                text: "Load"
+                on_release: root.load(filechooser.path, filechooser.selection)
+
+<SaveDialog>:
+    text_input: text_input
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        FileChooserIconView:
+            id: filechooser
+            on_selection: text_input.text = self.selection and self.selection[0] or ''
+
+        TextInput:
+            id: text_input
+            size_hint_y: None
+            height: 30
+            multiline: False
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+
+            Button:
+                text: "Save"
+                on_release: root.save(filechooser.path, text_input.text)
