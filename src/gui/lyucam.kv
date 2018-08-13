@@ -3,6 +3,11 @@
     drag_timeout: 10000000
     drag_distance: 0
 
+<FeatureTreeview>:
+    drag_rectangle: self.x, self.y, self.width, self.height
+    drag_timeout: 10000000
+    drag_distance: 0
+
 RootLayout:
     image: image
 
@@ -28,14 +33,15 @@ RootLayout:
             id: av
 
             ActionPrevious:
-            ActionButton:
-                text: 'Open file'
-                icon: 'data/icons/open_file.png'
-                on_release: root.show_load()
+            # ActionButton:
+            #     text: 'Open file'
+            #     icon: 'data/icons/open_file.png'
+            #     on_release: root.show_load()
 
             ActionButton:
                 text: 'Connect'
                 icon: 'data/icons/connect.png'
+                on_release: root.connect()
 
             ActionButton:
                 text: 'Disconnect'
@@ -61,10 +67,16 @@ RootLayout:
                 text: 'About'
                 icon: 'data/icons/about.png'
     BoxLayout:
+        orientation: 'horizontal'
+
         Image:
             id: image
             source: 'data/faust_github.jpg'
             size: self.texture_size
+        TreeView:
+            size_hint: .3, 1
+
+
 
 <LoadDialog>:
     BoxLayout:

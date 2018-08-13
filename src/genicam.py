@@ -741,6 +741,14 @@ class System(_object):
     __swig_destroy__ = _genicam.delete_System
     __del__ = lambda self: None
     if _newclass:
+        addCtiFile = staticmethod(_genicam.System_addCtiFile)
+    else:
+        addCtiFile = _genicam.System_addCtiFile
+    if _newclass:
+        removeCtiFile = staticmethod(_genicam.System_removeCtiFile)
+    else:
+        removeCtiFile = _genicam.System_removeCtiFile
+    if _newclass:
         getSystems = staticmethod(_genicam.System_getSystems)
     else:
         getSystems = _genicam.System_getSystems
@@ -795,6 +803,14 @@ class System(_object):
         return _genicam.System_getHandle(self)
 System_swigregister = _genicam.System_swigregister
 System_swigregister(System)
+
+def System_addCtiFile(filename):
+    return _genicam.System_addCtiFile(filename)
+System_addCtiFile = _genicam.System_addCtiFile
+
+def System_removeCtiFile(filename):
+    return _genicam.System_removeCtiFile(filename)
+System_removeCtiFile = _genicam.System_removeCtiFile
 
 def System_getSystems():
     return _genicam.System_getSystems()
