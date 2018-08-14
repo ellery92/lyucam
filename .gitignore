@@ -18,3 +18,5 @@ src/build/
 /src/gui/librc_genicam_api.so
 /src/gui/librc_genicam_api.so.1.3
 /src/gui/librc_genicam_api_static.a
+/camdemo
+camdemo_autogen
