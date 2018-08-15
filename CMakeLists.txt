@@ -13,7 +13,9 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 file(GLOB CAM_SRCS
-  "src/qtgui/*.cpp")
+  "src/qtgui/*.cpp"
+  "src/qtgui/imageviewer/*.cpp")
+
 add_executable(camdemo ${CAM_SRCS})
 target_link_libraries(camdemo Qt5::Widgets Qt5::Gui Qt5::Core)
 target_link_libraries(camdemo rc_genicam_api_static)

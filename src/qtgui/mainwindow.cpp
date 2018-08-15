@@ -11,6 +11,8 @@
 #include <rc_genicam_api/stream.h>
 #include <rc_genicam_api/config.h>
 #include <rc_genicam_api/exception.h>
+#include "imageviewer/image-viewer.h"
+#include "tcontainer.h"
 
 const QString system_keys[] =
   { "ID", "Ventdor", "Model", "Vendor version",
@@ -21,17 +23,6 @@ const QString device_keys[] =
   { "ID", "Vendor", "Model", "TL type", "Display name", "Aceess status",
     "Serial number", "Version", "TS Frequency"};
 
-struct device_status {
-  std::string device_id;
-  std::shared_ptr<rcg::Device> dev;
-  bool bopen;
-  std::shared_ptr<GenApi::CNodeMapRef> nodemap;
-  std::vector<std::shared_ptr<rcg::Stream> > stream;
-  std::vector<bool> bstreaming;
-};
-
-QHash<std::string, device_status> devHash;
-
 void ImageView::paintEvent(QPaintEvent *evt)
 {
   QPainter painter(this);
@@ -41,123 +32,48 @@ void ImageView::paintEvent(QPaintEvent *evt)
 void image_recv(uint8_t *buf, int w, int h, int len, void *user_data)
 {
   MainWindow *mwnd = (MainWindow*)user_data;
-  QImage &image = mwnd->imageView->getImage();
-  for (int i = 0; i < h; i++)
-    memcpy(image.scanLine(i), buf + i * w * 3, w * 3);
+  // QImage &image = mwnd->imageView->getImage();
+  // for (int i = 0; i < h; i++)
+  //   memcpy(image.scanLine(i), buf + i * w * 3, w * 3);
 
   emit mwnd->frameFinished();
 }
 
-MainWindow::MainWindow() {
-  QWidget *mainContentWidget = new QWidget();
-  setCentralWidget(mainContentWidget);
-  QHBoxLayout *mainLayout = new QHBoxLayout();
-  mainContentWidget->setLayout(mainLayout);
+QGraphicsView *gview;
 
-  QSizePolicy sp(QSizePolicy::Preferred, QSizePolicy::Preferred);
+RectLabel::RectLabel()
+{
+  QTimer *timer = new QTimer(this);
+  QObject::connect(timer, &QTimer::timeout, [=] {
+     char tip[256];
+     QPoint pt = parentWidget()->mapToParent(pos());
+     QGraphicsView *imageView = (QGraphicsView*)parentWidget()->parentWidget();
+     QRect rc(pt.x(), pt.y(), size().width(), size().height());
+     QPolygonF polyf = imageView->mapToScene(rc);
+     QRectF rcf = polyf.boundingRect();
+     sprintf(tip, "(%d, %d, %d, %d)", (int)rcf.x(), (int)rcf.y(),
+             (int)rcf.width(), (int)rcf.height());
+     setText(tip);
+  });
+  timer->start(500);
+}
 
-  QWidget *deviceContentWidget = new QWidget();
-  QVBoxLayout *deviceLayout = new QVBoxLayout();
-  sp.setHorizontalStretch(1.5);
-  deviceContentWidget->setSizePolicy(sp);
-  mainLayout->addWidget(deviceContentWidget);
-  deviceContentWidget->setLayout(deviceLayout);
+MainWindow::MainWindow()
+{
+  imageViewer = new pal::ImageViewer("", this);
+  gview = imageViewer->getView();
+  setCentralWidget(imageViewer);
 
-  deviceTree = new QTreeWidget;
-  // featureTree->header()->hide();
-  // sp.setVerticalStretch(5);
-  // deviceTree->setSizePolicy(sp);
-  deviceLayout->addWidget(deviceTree);
+  QLabel *lab1 = new RectLabel;
+  lab1->setStyleSheet("border: 1px solid red");
+  lab1->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+  TContainer *con1 = new TContainer(imageViewer->getView(), QPoint(10, 10), lab1);
 
-  QHash<QString, QVariant> hash;
-
-  QTreeWidgetItem *topitem, *item, *item2;
-  topitem = new QTreeWidgetItem(deviceTree);
-  topitem->setText(0, "System");
-  hash["type"] = "system";
-  for (int i = 0; i < sizeof(system_keys) / sizeof(system_keys[0]); i++)
-    hash[system_keys[i]] = "This is a system";
-  topitem->setData(0, Qt::UserRole, QVariant(hash));
-
-  item = new QTreeWidgetItem(topitem);
-  item->setText(0, "Interface");
-  hash.clear();
-  hash["type"] = "interface";
-  for (int i = 0; i < sizeof(interf_keys) / sizeof(interf_keys[0]); i++)
-    hash[interf_keys[i]] = "This is an Interface";
-  item->setData(0, Qt::UserRole, QVariant(hash));
-
-  item2 = new QTreeWidgetItem(item);
-  item2->setText(0, "device");
-  hash.clear();
-  hash["type"] = "device";
-  for (int i = 0; i < sizeof(device_keys) / sizeof(device_keys[0]); i++)
-    hash[device_keys[i]] = "This is a device";
-  item2->setData(0, Qt::UserRole, QVariant(hash));
-
-  QTreeWidgetItem *header = deviceTree->headerItem();
-  header->setText(0, "Device Tree");
-
-  deviceInfoView = new QListWidget();
-  deviceLayout->addWidget(deviceInfoView);
-
-  imageView = new ImageView;
-  sp.setHorizontalStretch(5);
-  imageView->setSizePolicy(sp);
-  imageView->setAutoFillBackground(true);
-  imageView->setBackgroundRole(QPalette::Dark);
-  imageView->setScaledContents(true);
-  mainLayout->addWidget(imageView);
-
-  featureTree = new QTreeWidget;
-  // featureTree->header()->hide();
-  featureTree->setColumnCount(2);
-  sp.setHorizontalStretch(3);
-  featureTree->setSizePolicy(sp);
-  mainLayout->addWidget(featureTree);
-  featureTree->setSelectionMode(QAbstractItemView::NoSelection);
-  featureTree->setFocusPolicy(Qt::NoFocus);
-
-  QTreeWidgetItem *category = new QTreeWidgetItem(featureTree);
-  category->setText(0, "Category");
-  item = new QTreeWidgetItem(category);
-  item->setText(0, "Exposure");
-  QWidget *widget = new QWidget();
-  QHBoxLayout *lout = new QHBoxLayout();
-  widget->setLayout(lout);
-
-  QSlider *slider = new QSlider(Qt::Horizontal);
-  QSpinBox *spinBox = new QSpinBox();
-
-  lout->addWidget(slider);
-  lout->addWidget(spinBox);
-  featureTree->setItemWidget(item, 1, widget);
-
-  item = new QTreeWidgetItem(category);
-  item->setText(0, "DeviceName");
-  lout = new QHBoxLayout();
-
-  QComboBox *comboBox = new QComboBox;
-  comboBox->addItem("Item1");
-  comboBox->addItem("Item2");
-  comboBox->addItem("Item3");
-  comboBox->setCurrentText("Item1");
-
-  QPushButton *btn = new QPushButton;
-  btn->setText("Exec");
-
-  lout->addWidget(btn);
-  widget = new QWidget();
-  widget->setLayout(lout);
-  featureTree->setItemWidget(item, 1, widget);
-
+  createDeviceWindow();
   createActions();
 
-  QObject::connect(this, SIGNAL(frameFinished()),
-                   imageView, SLOT(update()));
-
-  QObject::connect(deviceTree, &QTreeWidget::itemClicked,
-                   this, &MainWindow::onDeviceItemClicked);
+  // QObject::connect(this, SIGNAL(frameFinished()),
+  //                  imageView, SLOT(update()));
 }
 
 void MainWindow::addFeatureNode(QTreeWidgetItem *parent, GenApi::INode *node)
@@ -386,21 +302,60 @@ MainWindow::~MainWindow() {
 
 void MainWindow::createActions()
 {
-    QMenu *deviceMenu = menuBar()->addMenu(tr("Device"));
+  toolbar = new QToolBar();
+  QList<QByteArray> formats = QImageReader::supportedImageFormats();
+  QStringList list;
+  for (auto &fmt : formats)
+    list.append("*." + QString(fmt));
+  auto filter = "Images (" + list.join(" ") + ")";
 
-    deviceMenu->addAction(tr("Open"), this, &MainWindow::openDevice);
-    deviceMenu->addAction(tr("Close"), this, &MainWindow::closeDevice);
+  toolbar->addAction(QIcon("data/icons/open_file.png"), "update",[=] {
+  QString path = QFileDialog::getOpenFileName(nullptr, "Pick an image file",nullptr, filter);
+        if (path.isEmpty())
+            return;
+        imageViewer->setImage(QImage(path));
+  });
 
-    QToolBar *toolbar = new QToolBar();
-    updateAct = toolbar->addAction(QIcon("data/icons/update.png"), "update",
-                                   this,  &MainWindow::updateDeviceTree);
-    connAct = toolbar->addAction(QIcon("data/icons/connect.png"), "connect",
-                                 this, &MainWindow::openDevice);
-    connAct->setEnabled(false);
-    disconnAct = toolbar->addAction(QIcon("data/icons/disconnect.png"), "disconnect",
-                                    this, &MainWindow::closeDevice);
-    disconnAct->setEnabled(false);
-    addToolBar(toolbar);
+  updateAct = toolbar->addAction(QIcon("data/icons/update.png"), "update",
+                                 this,  &MainWindow::updateDeviceTree);
+  connAct = toolbar->addAction(QIcon("data/icons/connect.png"), "connect",
+                               this, &MainWindow::openDevice);
+  connAct->setEnabled(false);
+  disconnAct = toolbar->addAction(QIcon("data/icons/disconnect.png"), "disconnect",
+                                  this, &MainWindow::closeDevice);
+  disconnAct->setEnabled(false);
+  toolbar->addAction(QIcon("data/icons/device_attribute.png"), "device attribute",
+                    [=] { deviceDock->setVisible(!deviceDock->isVisible()); });
+
+  addToolBar(toolbar);
+}
+
+void MainWindow::createDeviceWindow()
+{
+  deviceDock = new QDockWidget(tr("Device Infomation"), this);
+  deviceDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+
+  QTabWidget *tab = new QTabWidget(deviceDock);
+  deviceDock->setWidget(tab);
+  QWidget *pageDevice = new QWidget();
+  tab->addTab(pageDevice, "Device");
+
+  QVBoxLayout *deviceLayout = new QVBoxLayout();
+  deviceTree = new QTreeWidget;
+  deviceLayout->addWidget(deviceTree);
+  QObject::connect(deviceTree, &QTreeWidget::itemClicked,
+                   this, &MainWindow::onDeviceItemClicked);
+
+  deviceInfoView = new QListWidget();
+  deviceLayout->addWidget(deviceInfoView);
+  pageDevice->setLayout(deviceLayout);
+
+  featureTree = new QTreeWidget;
+  featureTree->setColumnCount(2);
+  featureTree->setSelectionMode(QAbstractItemView::NoSelection);
+  featureTree->setFocusPolicy(Qt::NoFocus);
+  tab->addTab(featureTree, "Feature");
+  addDockWidget(Qt::RightDockWidgetArea, deviceDock);
 }
 
 void MainWindow::openDevice()

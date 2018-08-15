@@ -9,7 +9,7 @@
 #define RC_GENICAM_API_VERSION_MINOR 0
 #define RC_GENICAM_API_VERSION_PATCH 0
 /// package version as string, possibly with git commit: v1.2.3+4+g56789abc
-#define RC_GENICAM_API_PACKAGE_VERSION "0.0.0+5+g064b1ad"
+#define RC_GENICAM_API_PACKAGE_VERSION "0.0.0+6+g4dbcfc2"
 
 ///runtime versions, where the above values are linked into a lib and therefore reflect the version
 ///of the library itself (not the version of the header at compile time of the user code)

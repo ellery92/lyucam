@@ -2,7 +2,7 @@
 /// project version as major.minor.patch string
 const char* rc_genicam_api_runtime_project_version(){ return "0.0.0"; }
 /// package version as string, possibly with git commit: v1.2.3+4+g56789abc
-const char* rc_genicam_api_runtime_package_version(){ return "0.0.0+5+g064b1ad"; }
+const char* rc_genicam_api_runtime_package_version(){ return "0.0.0+6+g4dbcfc2"; }
 /// project version as integer: major * 10000 + minor * 100 + patch
 int rc_genicam_api_runtime_version_int()  { return 0; }
 /// project version as integer: major

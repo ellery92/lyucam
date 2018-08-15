@@ -2,24 +2,37 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QLabel>
+#include <GenApi/GenApi.h>
+
 class QTableView;
 class QTreeWidget;
 class QTreeWidgetItem;
 class QLabel;
 class QListWidget;
-#include <QLabel>
-#include <map>
-#include <rc_genicam_api/config.h>
+class QScrollArea;
+class QDockWidget;
 
-// class ImageView;
+namespace pal {
+  class ImageViewer;
+};
+
+class RectLabel : public QLabel
+{
+  Q_OBJECT
+public:
+  RectLabel();
+protected:
+  virtual void resizeEvent(QResizeEvent *e){};
+  virtual void moveEvent(QMoveEvent *e){};
+};
 
 class ImageView : public QLabel
 {
   Q_OBJECT
 
-  public:
-  ImageView(QWidget * parent = 0) : QLabel(parent) {
-  }
+public:
+  ImageView(QWidget * parent = 0) : QLabel(parent) {}
   ~ImageView(){}
 
   virtual void paintEvent(QPaintEvent *evt);
@@ -37,6 +50,7 @@ public:
   MainWindow();
   ~MainWindow();
   void createActions();
+  void createDeviceWindow();
 
 signals:
   void frameFinished();
@@ -63,15 +77,17 @@ protected:
   void setCurActiveDevice(std::string const &dev);
 
 public:
-  QTableView *deviceListView;
-  QTreeWidget *featureTree;
-  ImageView *imageView;
-  QTreeWidget *deviceTree;
+  pal::ImageViewer *imageViewer;
+
+  QDockWidget *deviceDock;
   QListWidget *deviceInfoView;
+  QTreeWidget *deviceTree;
+  QTreeWidget *featureTree;
 
   std::string curDeviceID;
   std::string curActiveDeviceID;
 
+  QToolBar *toolbar;
   QAction *updateAct;
   QAction *connAct;
   QAction *disconnAct;
