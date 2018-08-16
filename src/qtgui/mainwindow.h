@@ -22,24 +22,6 @@ class RectLabel : public QLabel
   Q_OBJECT
 public:
   RectLabel();
-protected:
-  virtual void resizeEvent(QResizeEvent *e){};
-  virtual void moveEvent(QMoveEvent *e){};
-};
-
-class ImageView : public QLabel
-{
-  Q_OBJECT
-
-public:
-  ImageView(QWidget * parent = 0) : QLabel(parent) {}
-  ~ImageView(){}
-
-  virtual void paintEvent(QPaintEvent *evt);
-  QImage &getImage() { return image; }
-
-private:
-  QImage image;
 };
 
 class MainWindow : public QMainWindow
@@ -51,9 +33,6 @@ public:
   ~MainWindow();
   void createActions();
   void createDeviceWindow();
-
-signals:
-  void frameFinished();
 
 private slots:
   void openDevice();
@@ -91,4 +70,7 @@ public:
   QAction *updateAct;
   QAction *connAct;
   QAction *disconnAct;
+  QAction *imageStartAct;
+  QAction *imageStopAct;
+  QAction *imagePauseAct;
 };

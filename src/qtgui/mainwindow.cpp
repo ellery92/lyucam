@@ -1,6 +1,5 @@
 #include <QtWidgets>
 #include "mainwindow.h"
-// #include "devicelistmodel.h"
 #include <QAbstractTableModel>
 #include <vector>
 #include <string>
@@ -11,6 +10,9 @@
 #include <rc_genicam_api/stream.h>
 #include <rc_genicam_api/config.h>
 #include <rc_genicam_api/exception.h>
+#include <rc_genicam_api/pixel_formats.h>
+#include <rc_genicam_api/image.h>
+
 #include "imageviewer/image-viewer.h"
 #include "tcontainer.h"
 
@@ -23,23 +25,67 @@ const QString device_keys[] =
   { "ID", "Vendor", "Model", "TL type", "Display name", "Aceess status",
     "Serial number", "Version", "TS Frequency"};
 
-void ImageView::paintEvent(QPaintEvent *evt)
+struct imageRecvThreadParam {
+  std::thread th;
+  bool stop;
+  bool pause;
+  std::shared_ptr<rcg::Stream> stream;
+  pal::ImageViewer *imageViewer;
+};
+struct imageRecvThreadParam imageParam;
+
+void imageRecvThreadFunc(struct imageRecvThreadParam *pImageParam)
 {
-  QPainter painter(this);
-  painter.drawImage(QPoint(0, 0), image);
+  while (!pImageParam->stop) {
+    const rcg::Buffer *buffer = pImageParam->stream->grab(1000);
+    if (buffer) {
+      if (!buffer->getIsIncomplete() && buffer->getImagePresent()) {
+        size_t width = buffer->getWidth();
+        size_t height = buffer->getHeight();
+        const unsigned char *p=static_cast<const unsigned char *>(buffer->getBase())+buffer->getImageOffset();
+        size_t px = buffer->getXPadding();
+        uint64_t format = buffer->getPixelFormat();
+        static QImage image;
+        size_t pstep;
+
+        switch (format) {
+        case Mono8:
+          if (image.isNull() || image.width() != width || image.height() != height
+              || image.format() != QImage::Format_Grayscale8)
+            image = QImage(width, height, QImage::Format_Grayscale8);
+          for (size_t k=0; k<height; k++) {
+              memcpy(image.scanLine(k), p, width);
+              p += width + px;
+          }
+          break;
+        case YCbCr411_8: // convert and store as color image
+          pstep = (width>>2) * 6 + px;
+          if (image.isNull() || image.width() != width || image.height() != height
+              || image.format() != QImage::Format_RGB888)
+            image = QImage(width, height, QImage::Format_RGB888);
+          for (size_t k=0; k<height; k++) {
+            uchar *data = image.scanLine(k);
+              for (size_t i=0; i<width; i+=4) {
+                  uint8_t rgb[12];
+                  rcg::convYCbCr411toQuadRGB(rgb, p, static_cast<int>(i));
+                  for (int j=0; j<12; j++)
+                    *data++ = static_cast<uchar>(rgb[j]);
+              }
+              p += pstep;
+          }
+          break;
+        default:
+          break;
+        }
+        pImageParam->imageViewer->setImage(image);
+      } else if (buffer->getIsIncomplete()) {
+          std::cerr << "storeBuffer(): Received incomplete buffer" << std::endl;
+      } else if (!buffer->getImagePresent()) {
+          std::cerr << "storeBuffer(): Received buffer without image" << std::endl;
+      }
+    }
+  }
 }
-
-void image_recv(uint8_t *buf, int w, int h, int len, void *user_data)
-{
-  MainWindow *mwnd = (MainWindow*)user_data;
-  // QImage &image = mwnd->imageView->getImage();
-  // for (int i = 0; i < h; i++)
-  //   memcpy(image.scanLine(i), buf + i * w * 3, w * 3);
-
-  emit mwnd->frameFinished();
-}
-
-QGraphicsView *gview;
 
 RectLabel::RectLabel()
 {
@@ -61,7 +107,6 @@ RectLabel::RectLabel()
 MainWindow::MainWindow()
 {
   imageViewer = new pal::ImageViewer("", this);
-  gview = imageViewer->getView();
   setCentralWidget(imageViewer);
 
   QLabel *lab1 = new RectLabel;
@@ -71,9 +116,6 @@ MainWindow::MainWindow()
 
   createDeviceWindow();
   createActions();
-
-  // QObject::connect(this, SIGNAL(frameFinished()),
-  //                  imageView, SLOT(update()));
 }
 
 void MainWindow::addFeatureNode(QTreeWidgetItem *parent, GenApi::INode *node)
@@ -326,6 +368,65 @@ void MainWindow::createActions()
   disconnAct->setEnabled(false);
   toolbar->addAction(QIcon("data/icons/device_attribute.png"), "device attribute",
                     [=] { deviceDock->setVisible(!deviceDock->isVisible()); });
+
+  imageStartAct = toolbar->addAction(QIcon("data/icons/start_acquisition.png"),
+                                     "start acquisition", [=] {
+       if (imageParam.pause) {
+         imageParam.pause = false;
+         imageStartAct->setEnabled(false);
+         imageStopAct->setEnabled(true);
+         imagePauseAct->setEnabled(true);
+         return;
+       }
+
+       std::shared_ptr<rcg::Device> dev=rcg::getDevice(curActiveDeviceID.c_str());
+       if (dev) {
+         std::vector<std::shared_ptr<rcg::Stream> > stream=dev->getStreams();
+         if (stream.size() > 0) {
+             // opening first stream
+           try {
+             stream[0]->open();
+             stream[0]->startStreaming();
+
+             imageParam.stop = false;
+             imageParam.pause = false;
+             imageParam.stream = stream[0];
+             imageParam.imageViewer = this->imageViewer;
+             imageParam.th = std::thread(imageRecvThreadFunc, &imageParam);
+
+             imageStartAct->setEnabled(false);
+             imageStopAct->setEnabled(true);
+             imagePauseAct->setEnabled(true);
+           } catch (rcg::GenTLException &e) {
+             std::cout << e.what() << std::endl;
+           }
+         }
+       }
+  });
+
+  imagePauseAct = toolbar->addAction(QIcon("data/icons/pause.png"), "pause", [=] {
+       imageParam.pause = true;
+       imageStartAct->setEnabled(true);
+       imagePauseAct->setEnabled(false);
+       imageStopAct->setEnabled(false);
+  });
+
+  imageStopAct = toolbar->addAction(QIcon("data/icons/stop_acquisition.png"),
+                                    "stop acquisition", [=] {
+       std::shared_ptr<rcg::Device> dev=rcg::getDevice(curActiveDeviceID.c_str());
+       if (dev) {
+         std::vector<std::shared_ptr<rcg::Stream> > stream=dev->getStreams();
+         if (stream.size() > 0) {
+           imageParam.stop = true;
+           imageParam.th.join();
+           stream[0]->stopStreaming();
+           stream[0]->close();
+         }
+       }
+       imageStartAct->setEnabled(true);
+       imageStopAct->setEnabled(false);
+       imagePauseAct->setEnabled(false);
+  });
 
   addToolBar(toolbar);
 }

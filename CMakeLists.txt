@@ -16,6 +16,9 @@ file(GLOB CAM_SRCS
   "src/qtgui/*.cpp"
   "src/qtgui/imageviewer/*.cpp")
 
+find_package (Threads)
+
 add_executable(camdemo ${CAM_SRCS})
 target_link_libraries(camdemo Qt5::Widgets Qt5::Gui Qt5::Core)
 target_link_libraries(camdemo rc_genicam_api_static)
+target_link_libraries (camdemo ${CMAKE_THREAD_LIBS_INIT})
